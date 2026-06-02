@@ -1,0 +1,42 @@
+{
+  "_instructions": "Fill in your Notion credentials here. Get Integration Token from https://www.notion.so/my-integrations. Create a new integration, copy the secret. Share your database pages with this integration.",
+  "integration_token": "YOUR_NOTION_INTEGRATION_TOKEN_HERE",
+  "databases": {
+    "stock_analysis": {
+      "id": "YOUR_STOCK_ANALYSIS_DATABASE_ID",
+      "_description": "Main database where individual stock analysis markdown pages are stored. Each page = one stock."
+    },
+    "portfolio_ledger": {
+      "id": "YOUR_PORTFOLIO_LEDGER_DATABASE_ID",
+      "_description": "Ledger tracking all positions: entry price, date, quantity, stop-loss, target, current status."
+    },
+    "watchlist": {
+      "id": "YOUR_WATCHLIST_DATABASE_ID",
+      "_description": "Stocks being monitored but not yet in position."
+    }
+  },
+  "page_properties": {
+    "stock_analysis": {
+      "Name": "title",
+      "Symbol": "rich_text",
+      "Sector": "select",
+      "Verdict": "select",
+      "Score": "number",
+      "Last_Analyzed": "date",
+      "Stage": "select",
+      "Notes": "rich_text"
+    },
+    "portfolio_ledger": {
+      "Name": "title",
+      "Symbol": "rich_text",
+      "Entry_Price": "number",
+      "Entry_Date": "date",
+      "Quantity": "number",
+      "Stop_Loss": "number",
+      "Target": "number",
+      "Current_Price": "number",
+      "PnL_Pct": "number",
+      "Status": "select"
+    }
+  }
+}

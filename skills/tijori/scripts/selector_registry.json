@@ -1,0 +1,424 @@
+{
+  "overview.company_name": {
+    "primary": {
+      "type": "css",
+      "selector": "title",
+      "confidence": 0.9
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": true,
+        "value_preview": "Dashboard | Tijori Finance"
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.current_price": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.market_cap": {
+    "primary": {
+      "type": "label",
+      "selector": "Market cap",
+      "confidence": 0.95
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.pe_ratio": {
+    "primary": {
+      "type": "label",
+      "selector": "P/E",
+      "confidence": 0.95
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.pb_ratio": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.ev_ebitda": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.roe": {
+    "primary": {
+      "type": "label",
+      "selector": "ROE (%)",
+      "confidence": 0.95
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.roce": {
+    "primary": {
+      "type": "label",
+      "selector": "ROCE (%)",
+      "confidence": 0.95
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.debt_equity": {
+    "primary": {
+      "type": "label",
+      "selector": "Debt to Equity",
+      "confidence": 0.95
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.dividend_yield": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.52w_high": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.52w_low": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.sector": {
+    "primary": {
+      "type": "css",
+      "selector": "[class*='sector']",
+      "confidence": 0.9
+    },
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": true,
+        "value_preview": "NBFC"
+      },
+      {
+        "date": "2026-06-02",
+        "success": true,
+        "value_preview": "View in-depth fundamental & technical data on sectors"
+      }
+    ]
+  },
+  "overview.industry": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      },
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.bse_code": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.nse_symbol": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.promoter_holding_pct": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.promoter": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.fii": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.fpi": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.dii": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.mutual fund": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.public": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.retail": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.nbfc": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "shareholding.insurance": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  },
+  "overview.promoter_pct": {
+    "primary": null,
+    "fallbacks": [],
+    "last_verified": "2026-06-02",
+    "extraction_history": [
+      {
+        "date": "2026-06-02",
+        "success": false,
+        "value_preview": null
+      }
+    ]
+  }
+}

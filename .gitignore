@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Project-specific configuration
+config/notion_config.json
+
+# Local sessions
+sessions/tijori_session.json
+
+# Scrape bundles & generated reports
+output/bundles/
+output/reports/
+
+# Local database state
+memory/stocks/*.json
+memory/ledger/*.json
+
+# Skill exploration logs
+skills/tijori/output/

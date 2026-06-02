@@ -1,0 +1,150 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "last_updated": "2026-06-02",
+    "source": "Minervini SEPA method + Indian Market Adaptations",
+    "notes": "All thresholds are MINIMUM requirements unless marked MAX. Scores are 0-100. Verdict thresholds: BUY>=70, HOLD>=45, SELL<45"
+  },
+
+  "verdict_thresholds": {
+    "BUY": 70,
+    "HOLD": 45,
+    "SELL": 0
+  },
+
+  "trend_template": {
+    "_description": "Minervini's Trend Template - all 8 conditions must be TRUE for a valid setup",
+    "price_above_150dma": true,
+    "price_above_200dma": true,
+    "dma_150_above_200": true,
+    "dma_200_trending_up_weeks": 1,
+    "dma_50_above_150_and_200": true,
+    "price_above_50dma": true,
+    "price_25pct_above_52week_low": true,
+    "price_within_25pct_of_52week_high": true,
+    "rs_rating_min": 70,
+    "_weight_in_total_score": 35
+  },
+
+  "fundamentals": {
+    "_weight_in_total_score": 35,
+    "eps_growth": {
+      "current_quarter_min_pct": 25,
+      "last_3_quarters_min_pct": 25,
+      "annual_min_pct": 25,
+      "_description": "EPS growth must be accelerating, not decelerating"
+    },
+    "sales_growth": {
+      "current_quarter_min_pct": 20,
+      "annual_min_pct": 15
+    },
+    "roe": {
+      "min_pct": 17
+    },
+    "roce": {
+      "min_pct": 15,
+      "_description": "Return on Capital Employed - important for Indian capital-intensive businesses"
+    },
+    "debt_to_equity": {
+      "max": 1.0,
+      "ideal_max": 0.5,
+      "_description": "Lower is better. Finance sector stocks excluded from this rule."
+    },
+    "promoter_holding": {
+      "min_pct": 40,
+      "recent_pledge_max_pct": 10,
+      "_description": "Indian market specific - promoter pledge is a red flag"
+    },
+    "promoter_holding_trend": {
+      "direction": "stable_or_increasing",
+      "_description": "Decreasing promoter stake is bearish signal"
+    },
+    "institutional_holding": {
+      "fii_or_dii_present": true,
+      "_description": "Smart money should be present"
+    },
+    "pe_ratio": {
+      "max_vs_sector_premium_pct": 50,
+      "_description": "Do not overpay. PE should not be more than 50% above sector median."
+    },
+    "revenue_visibility": {
+      "_description": "Order book or recurring revenue must be >= 2 quarters visible",
+      "quarters_visible_min": 2
+    }
+  },
+
+  "technicals": {
+    "_weight_in_total_score": 30,
+    "moving_averages": {
+      "use_emas": false,
+      "_description": "We use SMAs as per Minervini's original template"
+    },
+    "volume": {
+      "breakout_volume_min_pct_above_avg": 40,
+      "_description": "Breakout must be on 40%+ above average volume to be valid"
+    },
+    "rsi": {
+      "buy_zone_min": 50,
+      "buy_zone_max": 80,
+      "overbought_max": 80,
+      "_description": "RSI between 50-80 is the sweet spot for momentum stocks"
+    },
+    "macd": {
+      "signal": "bullish_crossover",
+      "_description": "MACD line crossing above signal line is bullish"
+    },
+    "vcp_pattern": {
+      "check": true,
+      "_description": "Volatility Contraction Pattern - Minervini's signature setup. Contraction in both price range and volume."
+    },
+    "pivot_point": {
+      "_description": "Buy within 5% of pivot breakout point. Do not chase beyond 5%.",
+      "max_buy_above_pivot_pct": 5
+    },
+    "support_levels": {
+      "stop_loss_below_pivot_pct": 7,
+      "_description": "Never risk more than 7% below entry point (hard stop-loss rule)"
+    },
+    "atr_multiple_for_target": 3,
+    "_description": "Target = Entry + 3x ATR(14)"
+  },
+
+  "macro_filters": {
+    "_description": "Market environment checks before any trade. If market is in Stage 3/4 decline, reduce position size or stay cash.",
+    "nifty50_above_200dma": "PREFERRED",
+    "india_vix_max": 22,
+    "_india_vix_note": "If VIX > 22, reduce position size by 50%. If VIX > 30, no new positions.",
+    "fii_flow_trend": "monitor",
+    "rbi_rate_cycle": "monitor",
+    "_description2": "Prefer accumulation when RBI is in rate-cut or pause cycle"
+  },
+
+  "position_sizing": {
+    "_description": "Risk-based position sizing. Never risk more than 1-2% of total portfolio on a single trade.",
+    "max_risk_per_trade_pct": 1.5,
+    "max_portfolio_in_single_stock_pct": 10,
+    "max_portfolio_in_single_sector_pct": 25,
+    "ideal_portfolio_stocks": 8,
+    "max_portfolio_stocks": 15
+  },
+
+  "stage_analysis": {
+    "_description": "Weinstein Stage Analysis - only buy in Stage 2 uptrend",
+    "BUY": "Stage 2 (price above rising 30-week MA, increasing volume)",
+    "HOLD": "Stage 2 (continuing)",
+    "SELL_WATCH": "Stage 3 (price topping, volume mixed)",
+    "SELL": "Stage 4 (price below 30-week MA, declining)"
+  },
+
+  "sell_rules": {
+    "_description": "When to sell - must obey at least one of these",
+    "stop_loss_hard_pct": 7,
+    "stop_loss_trailing_pct": 10,
+    "fundamentals_deteriorate": true,
+    "stage_changes_to_3_or_4": true,
+    "eps_miss_2_consecutive_quarters": true,
+    "promoter_pledge_increases_sharply": true,
+    "price_closes_below_200dma": true,
+    "achieved_target_exit_partial": 50
+  }
+}
