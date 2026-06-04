@@ -194,14 +194,260 @@ async def extract_with_registry(page, full_key: str, registry: dict) -> tuple[st
     return None, False
 
 
+async def extract_page_faqs(page) -> list:
+    """Extract all visible and hidden accordion Q&A pairs from the DOM."""
+    try:
+        faqs = await page.evaluate("""() => {
+            let data = [];
+            let headers = document.querySelectorAll('.faq_data_header');
+            headers.forEach(h => {
+                let q_el = h.querySelector('span');
+                let question = q_el ? q_el.innerText.trim() : h.innerText.trim();
+                let targetId = h.getAttribute('data-target');
+                if (targetId) {
+                    let ansContainer = document.querySelector(targetId);
+                    let answer = ansContainer ? ansContainer.innerText.trim() : '';
+                    data.push({
+                        question: question,
+                        answer: answer
+                    });
+                }
+            });
+            return data;
+        }""")
+        return faqs
+    except Exception as e:
+        print(f"     [FAQ Helper] Error extracting FAQs: {e}")
+        return []
+
+
 # ── Tab Scrapers ──────────────────────────────────────────────────────────────
+
+async def scrape_overview_sections(page) -> dict:
+    """Scrape and parse all in-page anchors on the overview page."""
+    sections_data = {
+        "custom_ratios": {},
+        "custom_financials": [],
+        "forensics": {},
+        "market_share": [],
+        "revenue_mix": [],
+        "operational_metrics": [],
+        "brands": [],
+        "corporate_actions": [],
+        "connections": {},
+        "knowledge_base": []
+    }
+
+    anchors = [
+        "custom_ratios", "custom_financials", "forensics", "marketshare",
+        "revenuemix", "operationalmetrics", "brands", "corporateactions",
+        "connections", "knowledgebase"
+    ]
+
+    for anchor in anchors:
+        print(f"     Scanning in-page Section: #{anchor}...")
+        loc = page.locator(f"#{anchor}").first
+        if await loc.count() == 0:
+            continue
+
+        try:
+            # Scroll element into view
+            await loc.scroll_into_view_if_needed(timeout=5000)
+            await asyncio.sleep(1.5)
+
+            # Try to click "View More" or "Show More" if visible to load full details
+            try:
+                view_more = loc.locator("button:has-text('View More'), button:has-text('Show More'), a:has-text('Show More'), a:has-text('View More')").first
+                if await view_more.count() > 0 and await view_more.is_visible():
+                    await view_more.click()
+                    await asyncio.sleep(1.0)
+            except Exception:
+                pass
+
+            # 1. Custom Financials, Revenue Mix, Market Share, Brands, Knowledge Base tables
+            if anchor in ("custom_financials", "revenuemix", "marketshare", "brands", "knowledgebase"):
+                if anchor == "custom_financials":
+                    print("     [Custom Financials] Checking for collapsed sections...")
+                    try:
+                        expansion_map = {
+                            "Balance sheet": "Net Block",
+                            "Profit & Loss": "Operating Profit",
+                            "Cash flow": "Cash from Operating Activity",
+                            "Ratios": "ROCE (%)"
+                        }
+                        for header, child in expansion_map.items():
+                            child_loc = loc.locator(f"tr:has-text('{child}')").first
+                            if await child_loc.count() == 0:
+                                print(f"     [Custom Financials] Section '{header}' is collapsed. Expanding...")
+                                header_row = loc.locator(f"tr:has-text('{header}')").first
+                                if await header_row.count() > 0:
+                                    btn = header_row.locator("svg, button, i, [class*='plus']").first
+                                    if await btn.count() > 0 and await btn.is_visible():
+                                        await btn.click()
+                                    else:
+                                        await header_row.click()
+                                    await asyncio.sleep(1.0)
+                    except Exception as ex:
+                        print(f"     [Custom Financials] Warning during expansion: {ex}")
+                tables = loc.locator("table")
+                t_count = await tables.count()
+                tables_list = []
+                for idx in range(t_count):
+                    table = tables.nth(idx)
+                    headers_el = table.locator("th")
+                    h_count = await headers_el.count()
+                    if h_count == 0:
+                        headers_el = table.locator("thead td")
+                        h_count = await headers_el.count()
+
+                    headers = []
+                    for h in range(h_count):
+                        try:
+                            headers.append((await headers_el.nth(h).inner_text(timeout=1000)).strip())
+                        except Exception:
+                            headers.append("")
+
+                    row_els = table.locator("tbody tr")
+                    r_count = await row_els.count()
+                    rows = []
+                    for r in range(min(r_count, 50)):
+                        try:
+                            cells = row_els.nth(r).locator("td")
+                            c_count = await cells.count()
+                            row_data = []
+                            for c in range(c_count):
+                                row_data.append((await cells.nth(c).inner_text(timeout=1000)).strip())
+                            if any(row_data):
+                                rows.append(row_data)
+                        except Exception:
+                            pass
+                    if headers or rows:
+                        tables_list.append({"headers": headers, "rows": rows})
+                
+                # Map to proper key name
+                key_map = {
+                    "custom_financials": "custom_financials",
+                    "revenuemix": "revenue_mix",
+                    "marketshare": "market_share",
+                    "brands": "brands",
+                    "knowledgebase": "knowledge_base"
+                }
+                sections_data[key_map[anchor]] = tables_list
+
+            # 2. Custom Ratios
+            elif anchor == "custom_ratios":
+                text = (await loc.inner_text()).strip()
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                ratios = {}
+                i = 0
+                while i < len(lines) - 1:
+                    label = lines[i]
+                    val = lines[i+1]
+                    if len(label) < 30 and len(val) < 20 and not label.lower().startswith("edit"):
+                        ratios[label] = val
+                        i += 2
+                    else:
+                        i += 1
+                sections_data["custom_ratios"] = ratios
+
+            # 3. Forensics warning lists and stats
+            elif anchor == "forensics":
+                text = (await loc.inner_text()).strip()
+                
+                # Try to parse counts
+                yes_match = re.search(r"(\d+)\s+Yes", text)
+                neutral_match = re.search(r"(\d+)\s+Neutral", text)
+                no_match = re.search(r"(\d+)\s+No(?!\s+Data)", text)
+                no_data_match = re.search(r"(\d+)\s+No Data", text)
+
+                stats = {
+                    "yes": int(yes_match.group(1)) if yes_match else 0,
+                    "neutral": int(neutral_match.group(1)) if neutral_match else 0,
+                    "no": int(no_match.group(1)) if no_match else 0,
+                    "no_data": int(no_data_match.group(1)) if no_data_match else 0,
+                }
+                
+                # Parse list items
+                items = []
+                lis = loc.locator("li")
+                for l_idx in range(await lis.count()):
+                    li_text = (await lis.nth(l_idx).inner_text()).strip()
+                    parts = [p.strip() for p in li_text.split("\n") if p.strip()]
+                    if len(parts) >= 2:
+                        items.append({
+                            "title": parts[0],
+                            "description": " ".join(parts[1:])
+                        })
+                
+                sections_data["forensics"] = {
+                    "stats": stats,
+                    "items": items
+                }
+
+            # 4. Corporate Actions
+            elif anchor == "corporateactions":
+                text = (await loc.inner_text()).strip()
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                actions = []
+                i = 0
+                while i < len(lines) - 2:
+                    line = lines[i]
+                    if re.match(r"^\d{4}", line):
+                        actions.append({
+                            "date": lines[i],
+                            "type": lines[i+1],
+                            "details": lines[i+2]
+                        })
+                        i += 3
+                    else:
+                        i += 1
+                sections_data["corporate_actions"] = actions
+
+            # 5. Connections
+            elif anchor == "connections":
+                text = (await loc.inner_text()).strip()
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                connections = {}
+                current_heading = "General"
+                for line in lines:
+                    if line in ("Customers", "Suppliers", "Partners", "Collaborations", "Directors", "Subsidiaries", "Holding Company"):
+                        current_heading = line
+                        connections[current_heading] = []
+                    else:
+                        if current_heading not in connections:
+                            connections[current_heading] = []
+                        if len(line) > 2:
+                            connections[current_heading].append(line)
+                sections_data["connections"] = connections
+
+            # 6. Operational Metrics
+            elif anchor == "operationalmetrics":
+                lis = loc.locator("li")
+                metrics = []
+                for l_idx in range(await lis.count()):
+                    val = (await lis.nth(l_idx).inner_text()).strip()
+                    if val:
+                        metrics.append(val)
+                sections_data["operational_metrics"] = metrics
+
+        except Exception as e:
+            print(f"     [WARN] Error scraping anchor #{anchor}: {e}")
+
+    return sections_data
+
 
 async def scrape_overview(page, symbol: str, registry: dict, base_url: str) -> dict:
     """Scrape Overview tab using registry selectors."""
     print(f"  [TAB 1/7] Overview...")
     await page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
-    await wait_for_content(page)
-    await scroll_and_wait(page, 400)
+    await page.wait_for_load_state("networkidle", timeout=10000)
+    
+    # Explicit wait for price elements to render
+    try:
+        await page.wait_for_selector(".price", timeout=5000)
+    except Exception:
+        await asyncio.sleep(2)
+        
     print(f"     URL: {page.url} | Title: {await page.title()}")
 
     keys = [
@@ -219,8 +465,74 @@ async def scrape_overview(page, symbol: str, registry: dict, base_url: str) -> d
         if ok:
             success_count += 1
 
-    print(f"     Extracted {success_count}/{len(keys)} fields")
-    data["_success_rate"] = success_count / len(keys)
+    # Smart robust fallbacks for price, 52W range, and key ratios
+    body_text = ""
+    try:
+        body_text = await page.locator("body").inner_text(timeout=5000)
+    except Exception:
+        pass
+
+    # 1. Current Price direct selector and regex
+    if not data.get("current_price"):
+        try:
+            price_el = page.locator(".price").first
+            if await price_el.count() > 0:
+                data["current_price"] = (await price_el.inner_text()).strip()
+        except Exception:
+            pass
+
+    if not data.get("current_price") and body_text:
+        price_match = re.search(r"₹\s*([\d,.]+)", body_text)
+        if price_match:
+            data["current_price"] = price_match.group(1)
+
+    # 2. 52W Low & High regex from body text
+    if not data.get("52w_low") and body_text:
+        low_match = re.search(r"Low\s*\n\s*([\d,.]+)", body_text)
+        if low_match:
+            data["52w_low"] = low_match.group(1)
+
+    if not data.get("52w_high") and body_text:
+        high_match = re.search(r"High\s*\n\s*([\d,.]+)", body_text)
+        if high_match:
+            data["52w_high"] = high_match.group(1)
+
+    print(f"     Extracting in-page secondary sections...")
+    sections = await scrape_overview_sections(page)
+    data["sections"] = sections
+
+    # 3. Dynamic Ratios Fallback Mapping from custom_ratios
+    cr = sections.get("custom_ratios", {})
+    if cr:
+        mapping = {
+            "market_cap": ["Market cap", "Market Cap"],
+            "pe_ratio": ["PE", "P/E", "pe"],
+            "roe": ["ROE (%)", "ROE"],
+            "roce": ["ROCE (%)", "ROCE"],
+            "debt_equity": ["Debt to Equity", "Debt to equity"],
+            "dividend_yield": ["Div Yield (%)", "Dividend Yield"],
+            "promoter_holding_pct": ["Prom Holding", "Promoter Holding"]
+        }
+        for data_key, cr_keys in mapping.items():
+            if not data.get(data_key):
+                for cr_key in cr_keys:
+                    if cr_key in cr:
+                        data[data_key] = cr[cr_key]
+                        break
+
+    # Recalculate resolved fields success rate
+    resolved_count = sum(1 for k in keys if data.get(k))
+    print(f"     Resolved {resolved_count}/{len(keys)} fields after smart fallbacks")
+    data["_success_rate"] = resolved_count / len(keys)
+
+    # Extract FAQs from the Overview page
+    try:
+        faqs = await extract_page_faqs(page)
+        data["faqs"] = faqs
+        print(f"     Extracted {len(faqs)} FAQs from Overview tab")
+    except Exception as e:
+        print(f"     [Overview] Error extracting FAQs: {e}")
+
     return data
 
 
@@ -301,6 +613,121 @@ async def scrape_financials(page, symbol: str, registry: dict, base_url: str) ->
                     result["pnl"][metric] = {"label": row[0], "values": row[1:], "headers": table_data["headers"][1:]}
                     break
 
+    # Extract FAQs from the Financials page
+    try:
+        faqs = await extract_page_faqs(page)
+        result["faqs"] = faqs
+        print(f"     Extracted {len(faqs)} FAQs from Financials tab")
+    except Exception as e:
+        print(f"     [Financials] Error extracting FAQs: {e}")
+
+    # Extract Fund Flow Analysis chart data
+    try:
+        fund_flow = {}
+        timeframes = ["1yr", "3yr", "5yr", "10yr"]
+        print("     Extracting Fund Flow Analysis chart data...")
+        for tf in timeframes:
+            tf_btn = page.locator(f"#fundflow-analysis li.innertab__tab[yeartab='{tf}']").first
+            if await tf_btn.count() > 0:
+                await tf_btn.click()
+                await asyncio.sleep(1.0) # Wait for animation/data reload
+                
+                chart_data = await page.evaluate("""() => {
+                    let sources = {};
+                    let uses = {};
+                    let container = document.getElementById('fundflow-analysis');
+                    if (!container) return null;
+                    let charts = container.querySelectorAll('.flow_analysis_chart');
+                    if (charts.length >= 2) {
+                        const parseChart = (chartEl) => {
+                            let dataObj = {};
+                            let labelEls = Array.from(chartEl.querySelectorAll('.highcharts-xaxis-labels text'));
+                            let valueEls = [];
+                            let textNodes = chartEl.querySelectorAll('text');
+                            textNodes.forEach(t => {
+                                let pClass = t.parentElement ? t.parentElement.getAttribute('class') || '' : '';
+                                if (pClass.includes('highcharts-data-label')) {
+                                    valueEls.push(t.textContent.trim());
+                                }
+                            });
+                            for (let j = 0; j < labelEls.length; j++) {
+                                let label = labelEls[j].textContent.trim();
+                                let value = valueEls[j] || '';
+                                if (label) {
+                                    dataObj[label] = value;
+                                }
+                            }
+                            return dataObj;
+                        };
+                        sources = parseChart(charts[0]);
+                        uses = parseChart(charts[1]);
+                    }
+                    return { sources, uses };
+                }""")
+                if chart_data:
+                    fund_flow[tf] = chart_data
+        
+        # Reset tab back to 1yr active state so we leave page clean
+        init_btn = page.locator("#fundflow-analysis li.innertab__tab[yeartab='1yr']").first
+        if await init_btn.count() > 0:
+            await init_btn.click()
+            await asyncio.sleep(0.5)
+
+        result["fund_flow"] = fund_flow
+        print(f"     Extracted Fund Flow Analysis for {len(fund_flow)} timeframes")
+    except Exception as e:
+        print(f"     [Financials] Error extracting Fund Flow Analysis: {e}")
+
+    # Extract Cash Flow Analysis chart data
+    try:
+        cash_flow_chart = {}
+        timeframes = ["1yr", "3yr", "5yr", "10yr"]
+        print("     Extracting Cash Flow Analysis chart data...")
+        for tf in timeframes:
+            tf_btn = page.locator(f"#cash_flow_analysis li.innertab__tab[yeartab='{tf}']").first
+            if await tf_btn.count() > 0:
+                await tf_btn.click()
+                await asyncio.sleep(1.0) # Wait for animation/data reload
+                
+                chart_data = await page.evaluate("""() => {
+                    let dataObj = {};
+                    let container = document.getElementById('cash_flow_analysis');
+                    if (!container) return null;
+                    let chart = container.querySelector('.flow_analysis_chart');
+                    if (chart) {
+                        let labelEls = Array.from(chart.querySelectorAll('.highcharts-xaxis-labels text'));
+                        let valueEls = [];
+                        let textNodes = chart.querySelectorAll('text');
+                        textNodes.forEach(t => {
+                            let pClass = t.parentElement ? t.parentElement.getAttribute('class') || '' : '';
+                            if (pClass.includes('highcharts-data-label')) {
+                                valueEls.push(t.textContent.trim());
+                            }
+                        });
+                        for (let j = 0; j < labelEls.length; j++) {
+                            let label = labelEls[j].textContent.trim();
+                            let value = valueEls[j] || '';
+                            if (label) {
+                                dataObj[label] = value;
+                            }
+                        }
+                    }
+                    return dataObj;
+                }""")
+                if chart_data:
+                    cash_flow_chart[tf] = chart_data
+        
+        # Reset tab back to 1yr active state so we leave page clean
+        init_btn = page.locator("#cash_flow_analysis li.innertab__tab[yeartab='1yr']").first
+        if await init_btn.count() > 0:
+            await init_btn.click()
+            await asyncio.sleep(0.5)
+
+        result["cash_flow_chart"] = cash_flow_chart
+        print(f"     Extracted Cash Flow Analysis for {len(cash_flow_chart)} timeframes")
+    except Exception as e:
+        print(f"     [Financials] Error extracting Cash Flow Analysis: {e}")
+
     print(f"     Extracted {len(result['tables'])} tables, {len(result['pnl'])} P&L metrics")
     return result
 
@@ -323,6 +750,47 @@ async def scrape_shareholding(page, symbol: str, registry: dict, base_url: str) 
         if ok:
             data["current"][cat.lower()] = val
             success_count += 1
+
+    # Robust Table 0 Fallback for current shareholding
+    if success_count < 3:
+        print("     [Shareholding] Success rate low. Parsing current shareholding from page tables directly...")
+        try:
+            tables = page.locator("table")
+            count = await tables.count()
+            if count > 0:
+                table = tables.first
+                row_els = table.locator("tbody tr")
+                r_count = await row_els.count()
+                if r_count == 0:
+                    row_els = table.locator("tr")
+                    r_count = await row_els.count()
+                for r in range(r_count):
+                    cells = row_els.nth(r).locator("td")
+                    c_count = await cells.count()
+                    if c_count == 0:
+                        cells = row_els.nth(r).locator("th")
+                        c_count = await cells.count()
+                    if c_count >= 2:
+                        label = (await cells.first.inner_text()).strip()
+                        val = (await cells.last.inner_text()).strip()
+                        label_lower = label.lower()
+                        if "promoter" in label_lower:
+                            data["current"]["promoter"] = val
+                        elif "mutual fund" in label_lower:
+                            data["current"]["mutual fund"] = val
+                        elif "insurance" in label_lower:
+                            data["current"]["insurance"] = val
+                        elif "fii" in label_lower or "fpi" in label_lower:
+                            data["current"]["fii"] = val
+                        elif "dii" in label_lower:
+                            data["current"]["dii"] = val
+                        elif "public" in label_lower or "retail" in label_lower or "others" in label_lower:
+                            data["current"]["public"] = val
+                
+                success_count = sum(1 for cat in categories if data["current"].get(cat.lower()))
+                print(f"     [Shareholding] Direct table parsing resolved {success_count} categories: {data['current']}")
+        except Exception as e:
+            print(f"     [Shareholding] Fallback parsing error: {e}")
 
     # Also extract the full shareholding table for historical trends
     try:
@@ -353,22 +821,44 @@ async def scrape_shareholding(page, symbol: str, registry: dict, base_url: str) 
 
     print(f"     Current shareholding: {success_count}/{len(categories)} categories found")
     data["_success_rate"] = success_count / len(categories)
+
+    # Extract FAQs from the Shareholding page
+    try:
+        faqs = await extract_page_faqs(page)
+        data["faqs"] = faqs
+        print(f"     Extracted {len(faqs)} FAQs from Shareholding tab")
+    except Exception as e:
+        print(f"     [Shareholding] Error extracting FAQs: {e}")
+
     return data
 
 
 async def scrape_peers(page, symbol: str, registry: dict, base_url: str) -> dict:
-    """Scrape peer comparison data."""
-    print(f"  [TAB 4/7] Peers...")
-    url = base_url.rstrip("/") + "/peers/"
+    """Scrape peer comparison data from competitors section on main page."""
+    print(f"  [TAB 4/6] Peers (Competitors)...")
+    url = base_url.rstrip("/") + "/#competitors"
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await wait_for_content(page)
-    await scroll_and_wait(page, 300)
+    
+    # Scroll to competitors
+    try:
+        loc = page.locator("#competitors").first
+        if await loc.count() > 0:
+            await loc.scroll_into_view_if_needed(timeout=5000)
+            await asyncio.sleep(1.5)
+    except Exception:
+        pass
+        
     print(f"     URL: {page.url}")
 
     data = {"peers": [], "headers": []}
     try:
-        tables = page.locator("table")
+        tables = page.locator("#competitors table")
         count = await tables.count()
+        if count == 0:
+            tables = page.locator("table:has-text('Peer Name')")
+            count = await tables.count()
+            
         for i in range(min(count, 5)):
             table = tables.nth(i)
             headers_el = table.locator("th")
@@ -384,7 +874,6 @@ async def scrape_peers(page, symbol: str, registry: dict, base_url: str) -> dict
                     c_count = await cells.count()
                     row_data = [(await cells.nth(c).inner_text(timeout=2000)).strip() for c in range(c_count)]
                     if any(row_data):
-                        # Map to dict using headers
                         peer_dict = dict(zip(headers, row_data)) if len(headers) == len(row_data) else {"values": row_data}
                         peers.append(peer_dict)
 
@@ -396,150 +885,137 @@ async def scrape_peers(page, symbol: str, registry: dict, base_url: str) -> dict
     except Exception as e:
         data["error"] = str(e)
 
+    data["_success_rate"] = 1.0 if data["peers"] else 0.0
     return data
 
 
-async def scrape_concall(page, symbol: str, registry: dict, base_url: str) -> dict:
-    """Scrape conference call summaries."""
-    print(f"  [TAB 5/7] Concall...")
-    url = base_url.rstrip("/") + "/concall/"
+async def scrape_benchmarking(page, symbol: str, registry: dict, base_url: str) -> dict:
+    """Scrape complete Benchmarking page."""
+    print(f"  [TAB 5/6] Benchmarking...")
+    url = base_url.rstrip("/") + "/benchmarking/"
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await wait_for_content(page)
-    await scroll_and_wait(page, 400)
+    await scroll_and_wait(page, 300)
     print(f"     URL: {page.url}")
 
-    # Use selector from registry
-    entry = registry.get("concall.concall_item_selector", {})
-    data = {"calls": [], "total_found": 0}
-
-    selectors_to_try = ["[class*='concall']", "[class*='conference']", "[class*='summary']",
-                        "[class*='transcript']", "article", ".card", "[class*='item']"]
-
-    for selector in selectors_to_try:
-        try:
-            els = page.locator(selector)
-            count = await els.count()
-            if count > 0:
-                print(f"     Found {count} concall items via {selector}")
-                data["total_found"] = count
-                calls = []
-                for i in range(min(count, 8)):  # Get last 8 quarters
-                    try:
-                        item = els.nth(i)
-                        text = (await item.inner_text(timeout=3000)).strip()
-                        if len(text) > 20:
-                            calls.append({"index": i, "content": text[:500]})
-                    except Exception:
-                        pass
-                if calls:
-                    data["calls"] = calls
-                    break
-        except Exception:
-            continue
-
-    if not data["calls"]:
-        # Fallback: get all text from the page
-        try:
-            main_el = page.locator("main, #content, .container").first
-            full_text = (await main_el.inner_text(timeout=5000)).strip()
-            data["page_text"] = full_text[:2000]
-            print(f"     Fallback: captured {len(full_text)} chars of page text")
-        except Exception:
-            pass
-
-    return data
-
-
-async def scrape_insider(page, symbol: str, registry: dict, base_url: str) -> dict:
-    """Scrape insider trading data."""
-    print(f"  [TAB 6/7] Insider Trades...")
-    url = base_url.rstrip("/") + "/insider/"
-    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-    await wait_for_content(page)
-    print(f"     URL: {page.url}")
-
-    data = {"trades": [], "headers": [], "net_trend": None}
+    data = {"tables": []}
     try:
         tables = page.locator("table")
         count = await tables.count()
-        if count > 0:
-            table = tables.first
+        print(f"     Found {count} table(s)")
+        
+        for i in range(min(count, 10)):
+            table = tables.nth(i)
             headers_el = table.locator("th")
             h_count = await headers_el.count()
-            headers = [(await headers_el.nth(i).inner_text(timeout=2000)).strip() for i in range(h_count)]
-            data["headers"] = headers
-
+            headers = [(await headers_el.nth(j).inner_text(timeout=2000)).strip() for j in range(h_count)]
+            
             row_els = table.locator("tbody tr")
             r_count = await row_els.count()
-            trades = []
-            buy_count = 0
-            sell_count = 0
-            for r in range(min(r_count, 20)):
+            rows = []
+            for r in range(min(r_count, 50)):
                 row = row_els.nth(r)
                 cells = row.locator("td")
                 c_count = await cells.count()
                 row_data = [(await cells.nth(c).inner_text(timeout=2000)).strip() for c in range(c_count)]
                 if any(row_data):
-                    trade = dict(zip(headers, row_data)) if len(headers) == len(row_data) else {"values": row_data}
-                    trades.append(trade)
-                    # Count buy/sell trend
-                    row_text = " ".join(row_data).lower()
-                    if "buy" in row_text or "purchase" in row_text:
-                        buy_count += 1
-                    elif "sell" in row_text or "sale" in row_text:
-                        sell_count += 1
-
-            data["trades"] = trades
-            data["total_trades"] = r_count
-            data["buy_count"] = buy_count
-            data["sell_count"] = sell_count
-            data["net_trend"] = "BUYING" if buy_count > sell_count else ("SELLING" if sell_count > buy_count else "NEUTRAL")
-            print(f"     {r_count} insider trades: {buy_count} buys, {sell_count} sells -> {data['net_trend']}")
+                    rows.append(row_data)
+                    
+            if rows or headers:
+                data["tables"].append({
+                    "table_index": i,
+                    "headers": headers,
+                    "rows": rows
+                })
     except Exception as e:
         data["error"] = str(e)
 
+    data["_success_rate"] = 1.0 if data["tables"] else 0.0
     return data
 
 
-async def scrape_timeline(page, symbol: str, registry: dict, base_url: str) -> dict:
-    """Scrape corporate timeline events."""
-    print(f"  [TAB 7/7] Timeline...")
-    url = base_url.rstrip("/") + "/timeline/"
+async def scrape_reports(page, symbol: str, registry: dict, base_url: str) -> dict:
+    """Scrape complete Reports page."""
+    print(f"  [TAB 6/6] Reports...")
+    url = base_url.rstrip("/") + "/reports/"
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await wait_for_content(page)
-    await scroll_and_wait(page, 500)
+    await scroll_and_wait(page, 300)
     print(f"     URL: {page.url}")
 
-    data = {"events": [], "total_found": 0}
-    selectors_to_try = [
-        "[class*='timeline-item']", "[class*='timeline'] > *", "[class*='event']",
-        "[class*='activity']", ".feed-item", "li[class*='item']", ".timeline li"
-    ]
+    data = {"tables": [], "premium_reports": [], "sample_reports": []}
+    
+    # 1. Look for standard tables if any exist
+    try:
+        tables = page.locator("table")
+        count = await tables.count()
+        print(f"     Found {count} table(s)")
+        
+        for i in range(min(count, 10)):
+            table = tables.nth(i)
+            headers_el = table.locator("th")
+            h_count = await headers_el.count()
+            headers = [(await headers_el.nth(j).inner_text(timeout=2000)).strip() for j in range(h_count)]
+            
+            row_els = table.locator("tbody tr")
+            r_count = await row_els.count()
+            rows = []
+            for r in range(min(r_count, 50)):
+                row = row_els.nth(r)
+                cells = row.locator("td")
+                c_count = await cells.count()
+                row_data = [(await cells.nth(c).inner_text(timeout=2000)).strip() for c in range(c_count)]
+                if any(row_data):
+                    rows.append(row_data)
+                    
+            if rows or headers:
+                data["tables"].append({
+                    "table_index": i,
+                    "headers": headers,
+                    "rows": rows
+                })
+    except Exception as e:
+        data["error"] = str(e)
 
-    for selector in selectors_to_try:
-        try:
-            els = page.locator(selector)
-            count = await els.count()
-            if count > 2:
-                data["total_found"] = count
-                events = []
-                for i in range(min(count, 20)):
-                    try:
-                        text = (await els.nth(i).inner_text(timeout=2000)).strip()
-                        if text and len(text) > 10:
-                            events.append({"index": i, "text": text[:300]})
-                    except Exception:
-                        pass
-                if events:
-                    data["events"] = events
-                    print(f"     Found {count} timeline events via {selector}")
-                    break
-        except Exception:
-            continue
+    # 2. Extract premium reports and samples from page body text and links
+    try:
+        body_text = await page.locator("body").inner_text(timeout=5000)
+        report_patterns = [
+            ("Risk Probe Report", r"Risk Probe Report\n(.*?)\nBuy Report", r"₹\s*([\d,.]+)"),
+            ("5 Year Revenue & EBITDA Estimates", r"5 Year Revenue & EBITDA Estimates\n(.*?)\nBuy Report", r"₹\s*([\d,.]+)")
+        ]
+        for name, desc_pat, price_pat in report_patterns:
+            desc_match = re.search(desc_pat, body_text, re.DOTALL)
+            if desc_match:
+                desc = desc_match.group(1).strip()
+                price_match = re.search(price_pat, body_text[body_text.find(name):body_text.find(name)+1000])
+                price = price_match.group(1) if price_match else "150.0"
+                data["premium_reports"].append({
+                    "name": name,
+                    "description": desc,
+                    "price": price,
+                    "available": True
+                })
 
-    if not data["events"]:
-        print(f"     No timeline events found with standard selectors")
+        # Parse sample reports from links on the page
+        links = await page.locator("a").all()
+        for link in links:
+            try:
+                href = await link.get_attribute("href")
+                if href and href.endswith(".pdf") and "report" in href.lower():
+                    text = (await link.inner_text()).strip()
+                    data["sample_reports"].append({
+                        "title": text or "Sample PDF",
+                        "url": href if href.startswith("http") else f"{TIJORI_BASE}{href}"
+                    })
+            except Exception:
+                pass
+                
+        print(f"     Extracted {len(data['tables'])} tables, {len(data['premium_reports'])} premium reports, {len(data['sample_reports'])} sample reports")
+    except Exception as e:
+        print(f"     [Reports] Error extracting text/samples: {e}")
 
+    data["_success_rate"] = 1.0 if (data["tables"] or data["premium_reports"] or data["sample_reports"]) else 0.0
     return data
 
 
@@ -553,7 +1029,7 @@ async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = Fals
     from playwright.async_api import async_playwright
 
     symbol = symbol.upper().strip()
-    all_tabs = ["overview", "financials", "shareholding", "peers", "concall", "insider", "timeline"]
+    all_tabs = ["overview", "financials", "benchmarking", "shareholding", "reports", "peers"]
     tabs_to_scrape = tabs or all_tabs
 
     print(f"\n{'='*60}")
@@ -580,11 +1056,10 @@ async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = Fals
         "price_data": {},
         "ratios": {},
         "financials": {},
+        "benchmarking": {},
         "shareholding": {},
+        "reports": {},
         "peers": [],
-        "concall": {},
-        "insider": {},
-        "timeline": {},
         "raw_errors": []
     }
 
@@ -618,11 +1093,10 @@ async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = Fals
         scraper_map = {
             "overview": scrape_overview,
             "financials": scrape_financials,
+            "benchmarking": scrape_benchmarking,
             "shareholding": scrape_shareholding,
+            "reports": scrape_reports,
             "peers": scrape_peers,
-            "concall": scrape_concall,
-            "insider": scrape_insider,
-            "timeline": scrape_timeline,
         }
 
         overall_success_rates = []
@@ -656,20 +1130,33 @@ async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = Fals
                     bundle["bse_code"] = tab_data.get("bse_code")
                     bundle["nse_symbol"] = tab_data.get("nse_symbol")
                     bundle["shareholding"]["promoter_pct_overview"] = tab_data.get("promoter_holding_pct")
+
+                    # Extract and copy all overview sections to top level of the bundle
+                    sections = tab_data.get("sections", {})
+                    bundle["custom_ratios"] = sections.get("custom_ratios", {})
+                    bundle["custom_financials"] = sections.get("custom_financials", [])
+                    bundle["forensics"] = sections.get("forensics", {})
+                    bundle["market_share"] = sections.get("market_share", [])
+                    bundle["revenue_mix"] = sections.get("revenue_mix", [])
+                    bundle["operational_metrics"] = sections.get("operational_metrics", [])
+                    bundle["brands"] = sections.get("brands", [])
+                    bundle["corporate_actions"] = sections.get("corporate_actions", [])
+                    bundle["connections"] = sections.get("connections", {})
+                    bundle["knowledge_base"] = sections.get("knowledge_base", [])
+                    bundle["overview_faqs"] = tab_data.get("faqs", [])
                 elif tab == "financials":
                     bundle["financials"] = tab_data
+                elif tab == "benchmarking":
+                    bundle["benchmarking"] = tab_data
                 elif tab == "shareholding":
                     bundle["shareholding"].update(tab_data.get("current", {}))
                     bundle["shareholding"]["history"] = tab_data.get("history", [])
+                    bundle["shareholding"]["faqs"] = tab_data.get("faqs", [])
+                elif tab == "reports":
+                    bundle["reports"] = tab_data
                 elif tab == "peers":
                     bundle["peers"] = tab_data.get("peers", [])
                     bundle["peers_headers"] = tab_data.get("headers", [])
-                elif tab == "concall":
-                    bundle["concall"] = tab_data
-                elif tab == "insider":
-                    bundle["insider"] = tab_data
-                elif tab == "timeline":
-                    bundle["timeline"] = tab_data
 
                 await human_delay(1200, 2200)
 

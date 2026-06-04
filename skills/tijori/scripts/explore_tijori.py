@@ -177,11 +177,10 @@ async def run_explorer(symbol: str):
         tabs = {
             "overview":     base_url,
             "financials":   base_url + "/financials/",
+            "benchmarking": base_url + "/benchmarking/",
             "shareholding": base_url + "/shareholding/",
-            "peers":        base_url + "/peers/",
-            "concall":      base_url + "/concall/",
-            "insider":      base_url + "/insider/",
-            "timeline":     base_url + "/timeline/",
+            "reports":      base_url + "/reports/",
+            "peers":        base_url + "#competitors",
         }
 
         for tab_name, tab_url in tabs.items():
@@ -196,10 +195,21 @@ async def run_explorer(symbol: str):
                 print(f"    Title     : {title}")
 
                 # Skip if redirected away
-                if "dashboard" in final_url.lower() and tab_name != "overview":
+                if "dashboard" in final_url.lower() and tab_name not in ("overview", "peers"):
                     print(f"    [!] Redirected to dashboard — tab may need premium or different URL")
                     findings["tabs"][tab_name] = {"redirected": True, "url": final_url}
                     continue
+
+                # Scroll to hash anchor if present
+                if "#" in tab_url:
+                    anchor = tab_url.split("#")[1]
+                    try:
+                        loc = page.locator(f"#{anchor}").first
+                        if await loc.count() > 0:
+                            await loc.scroll_into_view_if_needed(timeout=5000)
+                            print(f"    Scrolled to anchor: #{anchor}")
+                    except Exception:
+                        pass
 
                 # Scroll to trigger lazy loading
                 for _ in range(3):
