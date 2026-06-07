@@ -172,28 +172,55 @@ class UpstoxClient:
         data = resp.json()
         instruments = data.get("data", [])
 
-        # Filter for exact equity match
-        matches = [
-            inst for inst in instruments
-            if inst.get("instrument_type") == "EQ"
-            and inst.get("trading_symbol", "").upper() == symbol
-        ]
+        # Filter for equity segment
+        eq_instruments = [inst for inst in instruments if inst.get("instrument_type") == "EQ"]
 
-        if not matches:
-            # Fallback: try partial match on trading_symbol
-            matches = [
-                inst for inst in instruments
-                if inst.get("instrument_type") == "EQ"
-                and symbol in inst.get("trading_symbol", "").upper()
-            ]
-
-        if not matches:
+        if not eq_instruments:
             raise ValueError(
-                f"[Upstox] No equity instrument found for '{symbol}'. "
-                f"API returned {len(instruments)} results, none matched."
+                f"[Upstox] No equity instrument found for '{symbol}' in search results."
             )
 
-        instrument_key = matches[0]["instrument_key"]
+        best_match = None
+        best_score = -1
+
+        for inst in eq_instruments:
+            trading_symbol = inst.get("trading_symbol", "").upper()
+            name = inst.get("name", "").upper()
+            score = 0
+
+            # 1. Exact match on trading symbol
+            if trading_symbol == symbol:
+                score = 100
+            # 2. Query matches trading symbol prefix/suffix
+            elif trading_symbol in symbol or symbol in trading_symbol:
+                score = 80
+            # 3. Exact name match
+            elif name == symbol:
+                score = 70
+            # 4. Partial match on name
+            elif symbol in name or name in symbol:
+                score = 60
+            # 5. First word of query matches name or trading symbol
+            else:
+                words = symbol.split()
+                if words and (words[0] in name or words[0] in trading_symbol):
+                    score = 50
+                # 6. Single result fallback
+                elif len(eq_instruments) == 1:
+                    score = 30
+
+            if score > best_score:
+                best_score = score
+                best_match = inst
+
+        if not best_match or best_score <= 0:
+            raise ValueError(
+                f"[Upstox] No suitable equity instrument found for '{symbol}'. "
+                f"API returned {len(instruments)} results, none matched our scoring thresholds. "
+                f"Raw search results: {[i.get('trading_symbol') + ':' + i.get('name', '') for i in instruments]}"
+            )
+
+        instrument_key = best_match["instrument_key"]
 
         # Cache the result
         self._instrument_cache[symbol] = instrument_key

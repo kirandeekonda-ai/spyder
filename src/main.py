@@ -52,7 +52,7 @@ def load_latest_bundle(symbol: str) -> dict | None:
     files = sorted(BUNDLES_DIR.glob(f"{symbol}_*.json"), reverse=True)
     if not files:
         return None
-    with open(files[0]) as f:
+    with open(files[0], encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -170,7 +170,7 @@ def show_ledger():
         print("[Ledger] No positions found. Use 'add-position' to add a trade.")
         return
 
-    with open(ledger_file) as f:
+    with open(ledger_file, encoding="utf-8") as f:
         portfolio = json.load(f)
 
     positions = portfolio.get("positions", [])
@@ -197,7 +197,7 @@ def add_position(symbol: str, entry_price: float, quantity: int):
 
     portfolio = {"positions": []}
     if ledger_file.exists():
-        with open(ledger_file) as f:
+        with open(ledger_file, encoding="utf-8") as f:
             portfolio = json.load(f)
 
     stop_loss = round(entry_price * 0.93, 2)   # 7% stop-loss rule
@@ -225,7 +225,7 @@ def add_position(symbol: str, entry_price: float, quantity: int):
 
     portfolio["positions"] = positions
 
-    with open(ledger_file, "w") as f:
+    with open(ledger_file, "w", encoding="utf-8") as f:
         json.dump(portfolio, f, indent=2)
 
     print(f"\n[Ledger] Position added:")
@@ -324,7 +324,7 @@ async def run_analysis(symbol: str, portfolio_value: float = None, force_login: 
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     bundle_path = BUNDLES_DIR / f"{symbol.upper()}_{ts}.json"
                     BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
-                    with open(bundle_path, "w") as f:
+                    with open(bundle_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2)
                     print(f"  [Enrich] Enriched data bundle saved to: {bundle_path}")
                 else:
@@ -440,7 +440,7 @@ def main():
         print("  ANALYZED STOCKS MEMORY")
         print("="*60)
         for f in sorted(files):
-            with open(f) as fp:
+            with open(f, encoding="utf-8") as fp:
                 d = json.load(fp)
             last = d.get("last_analysis", {})
             history = d.get("history", [])
