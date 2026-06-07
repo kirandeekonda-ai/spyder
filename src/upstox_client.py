@@ -63,7 +63,7 @@ class UpstoxClient:
         """Load the local instrument key cache from sessions/instrument_cache.json."""
         if INSTRUMENT_CACHE_FILE.exists():
             try:
-                with open(INSTRUMENT_CACHE_FILE, "r") as f:
+                with open(INSTRUMENT_CACHE_FILE, "r", encoding="utf-8") as f:
                     cache = json.load(f)
                 print(f"[Upstox] Loaded instrument cache ({len(cache)} symbols)")
                 return cache
@@ -74,7 +74,7 @@ class UpstoxClient:
     def _save_instrument_cache(self):
         """Persist the instrument cache to disk."""
         INSTRUMENT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(INSTRUMENT_CACHE_FILE, "w") as f:
+        with open(INSTRUMENT_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(self._instrument_cache, f, indent=2)
 
     # ── HTTP Helper ──────────────────────────────────────────────────────────

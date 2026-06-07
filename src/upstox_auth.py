@@ -102,7 +102,7 @@ class UpstoxAuth:
             print("[UpstoxAuth] Create config/upstox_config.json with api_key, api_secret, redirect_uri")
             sys.exit(1)
 
-        with open(CONFIG_FILE, "r") as f:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
 
         # Bypass validation if direct access token is present
@@ -125,7 +125,7 @@ class UpstoxAuth:
         """Load cached token from sessions/upstox_token.json if it exists."""
         if TOKEN_FILE.exists():
             try:
-                with open(TOKEN_FILE, "r") as f:
+                with open(TOKEN_FILE, "r", encoding="utf-8") as f:
                     self._token_data = json.load(f)
                 print("[UpstoxAuth] Loaded cached token.")
             except (json.JSONDecodeError, IOError):
@@ -138,7 +138,7 @@ class UpstoxAuth:
         token_data["obtained_at"] = datetime.now(IST).isoformat()
         self._token_data = token_data
 
-        with open(TOKEN_FILE, "w") as f:
+        with open(TOKEN_FILE, "w", encoding="utf-8") as f:
             json.dump(token_data, f, indent=2)
 
         print(f"[UpstoxAuth] Token cached at {TOKEN_FILE}")

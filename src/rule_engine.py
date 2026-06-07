@@ -56,7 +56,7 @@ class RuleEngine:
         }
 
     def _load_rules(self) -> dict:
-        with open(RULES_FILE, "r") as f:
+        with open(RULES_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def _get(self, *keys, default=None) -> Any:

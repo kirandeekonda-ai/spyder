@@ -35,7 +35,7 @@ class CommitmentTracker:
         """Load Gemini API Key from config."""
         if GEMINI_CONFIG_FILE.exists():
             try:
-                with open(GEMINI_CONFIG_FILE, "r") as f:
+                with open(GEMINI_CONFIG_FILE, "r", encoding="utf-8") as f:
                     config = json.load(f)
                 key = config.get("api_key")
                 if key and not key.startswith("YOUR_"):

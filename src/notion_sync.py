@@ -43,7 +43,7 @@ class NotionSync:
         self._try_connect()
 
     def _load_config(self) -> dict:
-        with open(NOTION_CONFIG_FILE, "r") as f:
+        with open(NOTION_CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def _try_connect(self):

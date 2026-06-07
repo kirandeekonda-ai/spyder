@@ -15,7 +15,7 @@ def refresh_notion(symbol: str):
         print(f"[Refresh] Error: Memory file for {symbol} does not exist.")
         sys.exit(1)
         
-    with open(memory_file, "r") as f:
+    with open(memory_file, "r", encoding="utf-8") as f:
         mem_data = json.load(f)
         
     # Extract the last analysis scorecard
