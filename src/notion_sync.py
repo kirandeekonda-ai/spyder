@@ -165,6 +165,9 @@ class NotionSync:
         def para(text: str):
             return {"type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": text}}]}}
 
+        def quote(text: str):
+            return {"type": "quote", "quote": {"rich_text": [{"text": {"content": text}}]}}
+
         def divider():
             return {"type": "divider", "divider": {}}
 
@@ -180,6 +183,43 @@ class NotionSync:
         blocks.append(bullet(f"Fundamentals: {result.get('fundamental_score', 0)}/100 (35% weight)"))
         blocks.append(bullet(f"Technicals: {result.get('technical_score', 0)}/100 (30% weight)"))
         blocks.append(divider())
+
+        # Management Credibility Scorecard
+        cred_data = result.get("management_credibility")
+        if cred_data:
+            blocks.append(heading("🤝 Management Credibility Scorecard", 2))
+            score = cred_data.get("credibility_score", 0.0)
+            eval_count = cred_data.get("evaluated_count", 0)
+            total_count = cred_data.get("total_count", 0)
+            blocks.append(para(f"Overall Credibility Score: {score}/100"))
+            blocks.append(bullet(f"Tracked Promises: {total_count} total | {eval_count} evaluated against financials"))
+            
+            commitments = cred_data.get("commitments", [])
+            if commitments:
+                blocks.append(heading("Promises Evaluation Details", 3))
+                for c in commitments:
+                    metric = c.get("metric", "")
+                    target = c.get("target")
+                    actual = c.get("actual")
+                    timeframe = c.get("timeframe", "")
+                    status = c.get("status", "PENDING")
+                    promise_text = c.get("promise_text", "")
+                    unit = c.get("unit", "")
+                    
+                    status_emoji = "✅ MET" if status == "MET" else ("❌ MISSED" if status == "MISSED" else "⏳ PENDING")
+                    actual_str = f"{actual:.2f}{unit}" if isinstance(actual, (int, float)) else "N/A"
+                    target_str = f"{target:.2f}{unit}" if isinstance(target, (int, float)) else str(target)
+                    
+                    detail_str = f"{status_emoji} | {metric} target of {target_str} in {timeframe}"
+                    if status != "PENDING":
+                        detail_str += f" (Actual: {actual_str} | Score: {c.get('score')}/100)"
+                    else:
+                        detail_str += f" (Actual: {actual_str})"
+                        
+                    blocks.append(bullet(detail_str))
+                    if promise_text:
+                        blocks.append(quote(f"\"{promise_text}\""))
+            blocks.append(divider())
 
         # Technical indicators & metrics
         if price_data:
@@ -220,6 +260,19 @@ class NotionSync:
             vcp = price_data.get("vcp_detected")
             if vcp is not None:
                 blocks.append(bullet(f"VCP Pattern Detected: {'Yes' if vcp else 'No'}"))
+
+            # Relative Strength vs Nifty 50
+            rs_ratio = price_data.get("rs_ratio_latest")
+            rs_dma = price_data.get("rs_dma_50")
+            rs_pct = price_data.get("rs_ratio_pct_below_52w_high")
+            rs_trending = price_data.get("rs_line_trending_up", False)
+            if rs_ratio is not None:
+                trend_str = "Up (Above 50 DMA)" if rs_trending else "Down (Below 50 DMA)"
+                blocks.append(bullet(f"Relative Strength Ratio: {rs_ratio:.6f}"))
+                if rs_dma is not None:
+                    blocks.append(bullet(f"RS 50-day DMA: {rs_dma:.6f} (Trend: {trend_str})"))
+                if rs_pct is not None:
+                    blocks.append(bullet(f"RS Ratio % Below 52W High: {rs_pct:.1f}%"))
                 
             blocks.append(divider())
 

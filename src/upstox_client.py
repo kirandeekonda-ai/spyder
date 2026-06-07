@@ -226,8 +226,12 @@ class UpstoxClient:
         self._instrument_cache[symbol] = instrument_key
         self._save_instrument_cache()
         print(f"[Upstox] Instrument key for {symbol}: {instrument_key}")
-
         return instrument_key
+
+    
+    def fetch_nifty_candles(self, days: int = 365) -> list[dict]:
+        """Fetch Nifty 50 index daily candles."""
+        return self.fetch_daily_candles("NSE_INDEX|Nifty 50", days)
 
     # ── Historical Candles ───────────────────────────────────────────────────
 

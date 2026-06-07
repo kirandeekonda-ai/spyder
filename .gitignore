@@ -13,6 +13,7 @@ ENV/
 # Project-specific configuration
 config/notion_config.json
 config/upstox_config.json
+config/gemini_config.json
 
 # Local sessions
 sessions/tijori_session.json

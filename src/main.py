@@ -313,8 +313,15 @@ async def run_analysis(symbol: str, portfolio_value: float = None, force_login: 
                 # Fetch daily candles (365 days)
                 candles = client.fetch_daily_candles(key, days=365)
                 
+                # Fetch Nifty 50 daily candles for Relative Strength Line
+                nifty_candles = None
+                try:
+                    nifty_candles = client.fetch_nifty_candles(days=365)
+                except Exception as ne:
+                    print(f"  [Enrich] [WARN] Failed to fetch Nifty 50 candles: {ne}")
+                
                 if candles:
-                    enricher = PriceEnricher(candles, symbol=symbol)
+                    enricher = PriceEnricher(candles, nifty_candles=nifty_candles, symbol=symbol)
                     price_data = enricher.enrich_price_data()
                     
                     # Update data bundle's price_data

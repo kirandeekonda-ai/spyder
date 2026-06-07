@@ -232,6 +232,20 @@ class RuleEngine:
               bool(sales_growth and sales_growth >= rules["sales_growth"]["annual_min_pct"]),
               {"sales_growth_pct": sales_growth, "required": rules["sales_growth"]["annual_min_pct"]}, weight=2)
 
+        # Management Credibility Score
+        try:
+            from commitment_tracker import CommitmentTracker
+            tracker = CommitmentTracker(self.symbol)
+            eval_result = tracker.evaluate_commitments(self.data)
+            cred_score = eval_result["credibility_score"]
+            self.result["management_credibility"] = eval_result
+            
+            min_cred = rules.get("management_credibility", {}).get("min_score", 70.0)
+            check("management_credibility_sufficient", bool(cred_score >= min_cred),
+                  {"credibility_score": cred_score, "required": min_cred}, weight=2)
+        except Exception as e:
+            print(f"[RuleEngine] [WARN] Failed to evaluate management credibility: {e}")
+
         # PE vs Sector (informational)
         pe = self._parse_num(ratios.get("p_e"))
         if pe:
@@ -288,6 +302,20 @@ class RuleEngine:
         macd_ok = "bullish" in macd_signal or "crossover" in macd_signal
         check("macd_bullish_signal", macd_ok,
               {"macd_signal": price_data.get("macd_signal", "N/A")}, weight=2)
+
+        # Relative Strength Line vs Nifty 50
+        rs_pct = self._parse_num(price_data.get("rs_ratio_pct_below_52w_high"))
+        rs_trending = price_data.get("rs_line_trending_up", False)
+        rs_max_pct = rules.get("relative_strength", {}).get("rs_ratio_max_pct_below_52week_high", 15.0)
+        
+        if rs_pct is not None:
+            rs_ok = bool(rs_pct <= rs_max_pct)
+            check("rs_line_outperforming_nifty", rs_ok,
+                  {"rs_pct_below_52w_high": rs_pct, "max_allowed": rs_max_pct, "trending_up": rs_trending}, weight=2)
+            
+            # Extreme strength notification
+            if rs_pct <= 5.0 and rs_trending:
+                self.result["strengths"].append("Extreme Relative Strength (Near 52W High)")
 
         # If technical data not available, give neutral score
         if not any([rsi, volume_vs_avg]):

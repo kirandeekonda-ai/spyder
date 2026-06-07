@@ -41,17 +41,50 @@ class PriceEnricher:
     All calculations gracefully handle insufficient data by returning None.
     """
 
-    def __init__(self, candles: list[dict], symbol: str = "UNKNOWN"):
+    def __init__(self, candles: list[dict], nifty_candles: list[dict] = None, symbol: str = "UNKNOWN"):
         """
-        Initialize with raw candle data.
+        Initialize with raw candle data and optional Nifty 50 candles for Relative Strength Line.
 
         Args:
             candles: List of dicts, each with keys:
                      date, open, high, low, close, volume
+            nifty_candles: List of Nifty 50 daily candles.
             symbol: Stock symbol for logging purposes.
         """
         self.symbol = symbol.upper()
         self.df = self._prepare_dataframe(candles)
+        self.has_nifty = False
+        if nifty_candles:
+            self._integrate_nifty(nifty_candles)
+
+    def _integrate_nifty(self, nifty_candles: list[dict]):
+        """Align Nifty 50 close prices with stock close prices and compute RS line metrics."""
+        try:
+            nifty_df = pd.DataFrame(nifty_candles)
+            if nifty_df.empty or "close" not in nifty_df.columns or "date" not in nifty_df.columns:
+                print(f"[Price Enricher] [WARN] Nifty candles missing required columns")
+                return
+                
+            nifty_df["date"] = pd.to_datetime(nifty_df["date"], errors="coerce")
+            nifty_df = nifty_df.dropna(subset=["date"])
+            nifty_df = nifty_df.rename(columns={"close": "nifty_close"})[["date", "nifty_close"]]
+            nifty_df["nifty_close"] = pd.to_numeric(nifty_df["nifty_close"], errors="coerce")
+            
+            # Merge with stock df on date
+            self.df = pd.merge(self.df, nifty_df, on="date", how="left")
+            
+            # Forward fill and backward fill if any dates are missing in Nifty series
+            self.df["nifty_close"] = self.df["nifty_close"].ffill().bfill()
+            
+            # Calculate RS ratio
+            self.df["rs_ratio"] = self.df["close"] / self.df["nifty_close"]
+            
+            # Calculate 50 DMA of the RS Line
+            self.df["rs_dma_50"] = self.df["rs_ratio"].rolling(window=50, min_periods=50).mean()
+            self.has_nifty = True
+            print(f"[Price Enricher] [OK] Integrated Nifty 50 candles for Relative Strength Line.")
+        except Exception as e:
+            print(f"[Price Enricher] [ERR] Failed to integrate Nifty 50: {e}")
 
     def _prepare_dataframe(self, candles: list[dict]) -> pd.DataFrame:
         """
@@ -520,6 +553,35 @@ class PriceEnricher:
         # VCP detection
         vcp = self.detect_vcp()
 
+        # RS Line vs Nifty 50
+        rs_ratio_latest = None
+        rs_dma_50_latest = None
+        rs_ratio_52w_high = None
+        rs_ratio_pct_below_52w_high = None
+        rs_line_trending_up = False
+        
+        if self.has_nifty and "rs_ratio" in self.df.columns:
+            try:
+                # Latest value
+                rs_ratio_latest = float(self.df["rs_ratio"].iloc[-1])
+                
+                # RS DMA 50
+                if "rs_dma_50" in self.df.columns:
+                    val = self.df["rs_dma_50"].iloc[-1]
+                    if not pd.isna(val):
+                        rs_dma_50_latest = float(val)
+                        rs_line_trending_up = bool(rs_ratio_latest > rs_dma_50_latest)
+                
+                # 52w High of RS Ratio
+                trading_days_52w = min(252, len(self.df))
+                recent_rs = self.df["rs_ratio"].tail(trading_days_52w)
+                max_rs = recent_rs.max()
+                if not pd.isna(max_rs) and max_rs > 0:
+                    rs_ratio_52w_high = float(max_rs)
+                    rs_ratio_pct_below_52w_high = float((rs_ratio_52w_high - rs_ratio_latest) / rs_ratio_52w_high * 100.0)
+            except Exception as e:
+                print(f"[Price Enricher] [ERR] Failed to calculate RS Line stats: {e}")
+
         result = {
             "current_price": round(current_price, 4) if current_price is not None else None,
             "52w_high": round(high_52w, 4) if high_52w is not None else None,
@@ -532,12 +594,17 @@ class PriceEnricher:
             "macd_signal": macd_signal,
             "atr": atr,
             "vcp_detected": vcp["detected"],
+            "rs_ratio_latest": round(rs_ratio_latest, 6) if rs_ratio_latest is not None else None,
+            "rs_dma_50": round(rs_dma_50_latest, 6) if rs_dma_50_latest is not None else None,
+            "rs_ratio_52w_high": round(rs_ratio_52w_high, 6) if rs_ratio_52w_high is not None else None,
+            "rs_ratio_pct_below_52w_high": round(rs_ratio_pct_below_52w_high, 2) if rs_ratio_pct_below_52w_high is not None else None,
+            "rs_line_trending_up": rs_line_trending_up,
         }
 
         # Log what was computed vs what had insufficient data
         computed = [k for k, v in result.items() if v is not None and v is not False and v != "neutral"]
         skipped = [k for k, v in result.items()
-                   if v is None and k not in ("macd_signal", "vcp_detected")]
+                   if v is None and k not in ("macd_signal", "vcp_detected", "rs_ratio_latest", "rs_dma_50", "rs_ratio_52w_high", "rs_ratio_pct_below_52w_high")]
         if skipped:
             print(f"[Price Enricher] Insufficient data for: {', '.join(skipped)} "
                   f"(have {len(self.df)} candles)")

@@ -1,0 +1,46 @@
+{
+  "CONFIDENCE PETROLEUM": [
+    {
+      "metric": "Net Sales",
+      "target_value": 4500.0,
+      "timeframe": "MAR'26",
+      "operator": "gte",
+      "promise_text": "We target to cross 4,500 Cr in sales in FY26.",
+      "unit": "Cr"
+    },
+    {
+      "metric": "OPM (%)",
+      "target_value": 8.0,
+      "timeframe": "MAR'26",
+      "operator": "gte",
+      "promise_text": "We expect OPM to recover to 8% in FY26.",
+      "unit": "%"
+    },
+    {
+      "metric": "Operating Profit",
+      "target_value": 330.0,
+      "timeframe": "MAR'26",
+      "operator": "gte",
+      "promise_text": "We expect operating profit to cross 330 Cr in FY26.",
+      "unit": "Cr"
+    }
+  ],
+  "HDFCBANK": [
+    {
+      "metric": "Profit After Tax",
+      "target_value": 18000.0,
+      "timeframe": "DEC'25",
+      "operator": "gte",
+      "promise_text": "We expect standalone net profit to cross 18,000 Cr in DEC'25.",
+      "unit": "Cr"
+    },
+    {
+      "metric": "OPM (%)",
+      "target_value": 15.0,
+      "timeframe": "MAR'26",
+      "operator": "gte",
+      "promise_text": "We expect post-merger net interest margins and operating efficiency to hover around 15% OPM in FY26.",
+      "unit": "%"
+    }
+  ]
+}

@@ -70,6 +70,10 @@
     "revenue_visibility": {
       "_description": "Order book or recurring revenue must be >= 2 quarters visible",
       "quarters_visible_min": 2
+    },
+    "management_credibility": {
+      "min_score": 70.0,
+      "_description": "Management credibility score based on guidance commitments met"
     }
   },
 
@@ -106,7 +110,11 @@
       "_description": "Never risk more than 7% below entry point (hard stop-loss rule)"
     },
     "atr_multiple_for_target": 3,
-    "_description": "Target = Entry + 3x ATR(14)"
+    "_description": "Target = Entry + 3x ATR(14)",
+    "relative_strength": {
+      "rs_ratio_max_pct_below_52week_high": 15.0,
+      "_description": "Relative strength line should be within 15% of its 52-week high (outperforming Nifty)"
+    }
   },
 
   "macro_filters": {

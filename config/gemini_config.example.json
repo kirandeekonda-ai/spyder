@@ -1,0 +1,4 @@
+{
+  "_instructions": "Enter your Gemini API key below to enable automatic extraction of quantitative commitments from concall PDFs. Get a key from https://aistudio.google.com/.",
+  "api_key": "YOUR_GEMINI_API_KEY"
+}
