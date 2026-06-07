@@ -1,0 +1,7 @@
+{
+  "_instructions": "Fill in your Upstox API credentials here. Get API key and secret from https://account.upstox.com/developer/apps. Create a new app, set redirect URI to http://127.0.0.1:5000/callback, then copy the API key and secret below.",
+  "api_key": "YOUR_UPSTOX_API_KEY",
+  "api_secret": "YOUR_UPSTOX_API_SECRET",
+  "redirect_uri": "http://127.0.0.1:5000/callback",
+  "access_token": "YOUR_DIRECT_ACCESS_TOKEN"
+}

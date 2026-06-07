@@ -270,7 +270,7 @@ async def run_tijori_skill(symbol: str, force_login: bool = False, deep: bool = 
         return data
 
 
-async def run_analysis(symbol: str, portfolio_value: float = None, force_login: bool = False, demo: bool = False, deep: bool = False):
+async def run_analysis(symbol: str, portfolio_value: float = None, force_login: bool = False, demo: bool = False, deep: bool = False, enrich: bool = False):
     """Full analysis pipeline: Scrape -> Evaluate -> Sync -> Report."""
     symbol = symbol.upper()
     print(f"\n{'='*60}")
@@ -296,6 +296,41 @@ async def run_analysis(symbol: str, portfolio_value: float = None, force_login: 
                 data = await run_tijori_skill(symbol, force_login, deep=deep)
         else:
             data = await run_tijori_skill(symbol, force_login, deep=deep)
+
+        if enrich:
+            print("\n  [Enrich] Fetching price data and technical indicators from Upstox...")
+            try:
+                from upstox_auth import UpstoxAuth
+                from upstox_client import UpstoxClient
+                from price_enricher import PriceEnricher
+
+                auth = UpstoxAuth()
+                client = UpstoxClient(auth)
+                
+                # Resolve symbol to instrument key
+                key = client.resolve_instrument_key(symbol)
+                
+                # Fetch daily candles (365 days)
+                candles = client.fetch_daily_candles(key, days=365)
+                
+                if candles:
+                    enricher = PriceEnricher(candles, symbol=symbol)
+                    price_data = enricher.enrich_price_data()
+                    
+                    # Update data bundle's price_data
+                    data["price_data"] = price_data
+                    
+                    # Overwrite/save the bundle to cache so it has the enriched data
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    bundle_path = BUNDLES_DIR / f"{symbol.upper()}_{ts}.json"
+                    BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
+                    with open(bundle_path, "w") as f:
+                        json.dump(data, f, indent=2)
+                    print(f"  [Enrich] Enriched data bundle saved to: {bundle_path}")
+                else:
+                    print("  [Enrich] [WARN] No candles fetched. Keeping existing/null price data.")
+            except Exception as e:
+                print(f"  [Enrich] [ERR] Price enrichment failed: {e}")
 
     # -- Phase 2: Rule Evaluation (Python Math) ------------------------------------
     print("\n[PHASE 2] Rule Evaluation (Local Math Engine)")
@@ -359,13 +394,14 @@ def main():
 
     if command in ("analyze", "analyse"):
         if len(sys.argv) < 3:
-            print("Usage: python src/main.py analyze <SYMBOL> [--portfolio <value>] [--login] [--fresh]")
+            print("Usage: python src/main.py analyze <SYMBOL> [--portfolio <value>] [--login] [--fresh] [--enrich]")
             sys.exit(1)
         symbol = sys.argv[2]
         portfolio = None
         force_login = "--login" in sys.argv
         demo = "--demo" in sys.argv
         deep = "--deep" in sys.argv
+        enrich = "--enrich" in sys.argv
         if "--portfolio" in sys.argv:
             idx = sys.argv.index("--portfolio")
             try:
@@ -374,7 +410,7 @@ def main():
                 print("Invalid portfolio value.")
                 sys.exit(1)
 
-        asyncio.run(run_analysis(symbol, portfolio_value=portfolio, force_login=force_login, demo=demo, deep=deep))
+        asyncio.run(run_analysis(symbol, portfolio_value=portfolio, force_login=force_login, demo=demo, deep=deep, enrich=enrich))
 
     elif command == "demo":
         symbol = sys.argv[2] if len(sys.argv) > 2 else "DEMO"

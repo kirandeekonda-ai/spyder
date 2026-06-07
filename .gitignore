@@ -12,9 +12,12 @@ ENV/
 
 # Project-specific configuration
 config/notion_config.json
+config/upstox_config.json
 
 # Local sessions
 sessions/tijori_session.json
+sessions/upstox_token.json
+sessions/instrument_cache.json
 
 # Scrape bundles, reports, and downloads
 output/
