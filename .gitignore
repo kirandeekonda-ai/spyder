@@ -16,9 +16,9 @@ config/notion_config.json
 # Local sessions
 sessions/tijori_session.json
 
-# Scrape bundles & generated reports
-output/bundles/
-output/reports/
+# Scrape bundles, reports, and downloads
+output/
+scratch/
 
 # Local database state
 memory/stocks/*.json

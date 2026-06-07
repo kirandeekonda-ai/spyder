@@ -264,8 +264,8 @@ async def scrape_overview_sections(page) -> dict:
             except Exception:
                 pass
 
-            # 1. Custom Financials, Revenue Mix, Market Share, Brands, Knowledge Base tables
-            if anchor in ("custom_financials", "revenuemix", "marketshare", "brands", "knowledgebase"):
+            # 1. Custom Financials, Revenue Mix, Market Share, Brands tables
+            if anchor in ("custom_financials", "revenuemix", "marketshare", "brands"):
                 if anchor == "custom_financials":
                     print("     [Custom Financials] Checking for collapsed sections...")
                     try:
@@ -329,10 +329,64 @@ async def scrape_overview_sections(page) -> dict:
                     "custom_financials": "custom_financials",
                     "revenuemix": "revenue_mix",
                     "marketshare": "market_share",
-                    "brands": "brands",
-                    "knowledgebase": "knowledge_base"
+                    "brands": "brands"
                 }
                 sections_data[key_map[anchor]] = tables_list
+
+            elif anchor == "knowledgebase":
+                tables = loc.locator("table")
+                t_count = await tables.count()
+                tables_list = []
+                for idx in range(t_count):
+                    table = tables.nth(idx)
+                    headers_el = table.locator("th")
+                    h_count = await headers_el.count()
+                    if h_count == 0:
+                        headers_el = table.locator("thead td")
+                        h_count = await headers_el.count()
+
+                    headers = []
+                    for h in range(h_count):
+                        try:
+                            headers.append((await headers_el.nth(h).inner_text(timeout=1000)).strip())
+                        except Exception:
+                            headers.append("")
+
+                    row_els = table.locator("tbody tr")
+                    r_count = await row_els.count()
+                    rows = []
+                    for r in range(min(r_count, 50)):
+                        try:
+                            row = row_els.nth(r)
+                            cells = row.locator("td")
+                            c_count = await cells.count()
+                            row_data = []
+                            for c in range(c_count):
+                                cell = cells.nth(c)
+                                text = (await cell.inner_text(timeout=1000)).strip()
+                                links = cell.locator("a")
+                                l_count = await links.count()
+                                if l_count > 0:
+                                    link_list = []
+                                    for l_idx in range(l_count):
+                                        a_el = links.nth(l_idx)
+                                        href = await a_el.get_attribute("href")
+                                        a_text = (await a_el.inner_text()).strip()
+                                        if href:
+                                            link_list.append({
+                                                "text": a_text,
+                                                "href": href if href.startswith("http") else f"{TIJORI_BASE}{href}"
+                                            })
+                                    row_data.append({"text": text, "links": link_list})
+                                else:
+                                    row_data.append({"text": text})
+                            if any(row_data):
+                                rows.append(row_data)
+                        except Exception as e:
+                            print(f"     [KnowledgeBase] Row error: {e}")
+                    if headers or rows:
+                        tables_list.append({"headers": headers, "rows": rows})
+                sections_data["knowledge_base"] = tables_list
 
             # 2. Custom Ratios
             elif anchor == "custom_ratios":
@@ -1021,7 +1075,7 @@ async def scrape_reports(page, symbol: str, registry: dict, base_url: str) -> di
 
 # ── Main Scraper ──────────────────────────────────────────────────────────────
 
-async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = False):
+async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = False, deep: bool = False):
     """
     Main production scraper. Extracts all data from Tijori for a given symbol.
     Returns the full data bundle dict AND saves to output/bundles/.
@@ -1172,6 +1226,18 @@ async def run_scraper(symbol: str, tabs: list = None, force_explore: bool = Fals
     overall_rate = sum(overall_success_rates) / len(overall_success_rates) if overall_success_rates else 0
     bundle["extraction_stats"]["overall"] = f"{overall_rate*100:.0f}%"
 
+    # Deep Analysis: Download and parse knowledge base PDFs
+    if deep and bundle.get("knowledge_base"):
+        print("\n  [DEEP] Downloading and parsing knowledge base PDFs...")
+        try:
+            sys.path.insert(0, str(BASE_DIR / "src"))
+            from pdf_handler import process_knowledge_base_pdfs
+            pdf_data = process_knowledge_base_pdfs(bundle["knowledge_base"], symbol)
+            bundle["knowledge_base_text"] = pdf_data
+            print(f"  [DEEP] Extracted text from latest PDFs successfully: {list(pdf_data.keys())}")
+        except Exception as e:
+            print(f"  [DEEP ERROR] Could not process PDFs: {e}")
+
     # Save bundle
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_file = OUTPUT_DIR / f"{symbol}_{timestamp}.json"
@@ -1204,6 +1270,7 @@ if __name__ == "__main__":
     symbol = sys.argv[1]
     tabs = None
     force_explore = "--force-explore" in sys.argv
+    deep = "--deep" in sys.argv
 
     if "--tabs" in sys.argv:
         idx = sys.argv.index("--tabs")
@@ -1213,4 +1280,4 @@ if __name__ == "__main__":
             print("Error: --tabs requires a comma-separated list, e.g., --tabs overview,financials")
             sys.exit(1)
 
-    asyncio.run(run_scraper(symbol, tabs=tabs, force_explore=force_explore))
+    asyncio.run(run_scraper(symbol, tabs=tabs, force_explore=force_explore, deep=deep))

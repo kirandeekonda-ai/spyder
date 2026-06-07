@@ -203,7 +203,21 @@ class NotionSync:
         if result.get("notes"):
             blocks.append(divider())
             blocks.append(heading("Notes", 2))
-            blocks.append(para(result["notes"]))
+            
+            for line in result["notes"].split("\n"):
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                if line_str.startswith("### "):
+                    blocks.append(heading(line_str[4:], 3))
+                elif line_str.startswith("## "):
+                    blocks.append(heading(line_str[3:], 2))
+                elif line_str.startswith("# "):
+                    blocks.append(heading(line_str[2:], 1))
+                elif line_str.startswith("* ") or line_str.startswith("- "):
+                    blocks.append(bullet(line_str[2:][:2000]))
+                else:
+                    blocks.append(para(line_str[:2000]))
 
         return blocks
 

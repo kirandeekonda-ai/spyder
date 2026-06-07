@@ -237,7 +237,7 @@ def add_position(symbol: str, entry_price: float, quantity: int):
 
 # ── Main Analysis Flow ────────────────────────────────────────────────────────
 
-async def run_tijori_skill(symbol: str, force_login: bool = False) -> dict:
+async def run_tijori_skill(symbol: str, force_login: bool = False, deep: bool = False) -> dict:
     """
     Run the Tijori skill scraper (full multi-tab extraction).
     If registry doesn't exist, runs explorer first.
@@ -259,7 +259,7 @@ async def run_tijori_skill(symbol: str, force_login: bool = False) -> dict:
     sys.path.insert(0, str(BASE_DIR / "skills" / "tijori" / "scripts"))
     try:
         from scrape_tijori import run_scraper
-        data = await run_scraper(symbol)
+        data = await run_scraper(symbol, deep=deep)
         return data
     except Exception as e:
         print(f"  [Tijori] Skill scraper failed: {e}. Falling back to basic scraper...")
@@ -270,7 +270,7 @@ async def run_tijori_skill(symbol: str, force_login: bool = False) -> dict:
         return data
 
 
-async def run_analysis(symbol: str, portfolio_value: float = None, force_login: bool = False, demo: bool = False):
+async def run_analysis(symbol: str, portfolio_value: float = None, force_login: bool = False, demo: bool = False, deep: bool = False):
     """Full analysis pipeline: Scrape -> Evaluate -> Sync -> Report."""
     symbol = symbol.upper()
     print(f"\n{'='*60}")
@@ -289,13 +289,13 @@ async def run_analysis(symbol: str, portfolio_value: float = None, force_login: 
         if existing:
             scraped_date = existing.get("scraped_at", "")[:10]
             today = datetime.now().strftime("%Y-%m-%d")
-            if scraped_date == today and not force_login:
+            if scraped_date == today and not force_login and (not deep or "knowledge_base_text" in existing):
                 print(f"  Using today's cached data (scraped at {existing['scraped_at'][:19]})")
                 data = existing
             else:
-                data = await run_tijori_skill(symbol, force_login)
+                data = await run_tijori_skill(symbol, force_login, deep=deep)
         else:
-            data = await run_tijori_skill(symbol, force_login)
+            data = await run_tijori_skill(symbol, force_login, deep=deep)
 
     # -- Phase 2: Rule Evaluation (Python Math) ------------------------------------
     print("\n[PHASE 2] Rule Evaluation (Local Math Engine)")
@@ -365,6 +365,7 @@ def main():
         portfolio = None
         force_login = "--login" in sys.argv
         demo = "--demo" in sys.argv
+        deep = "--deep" in sys.argv
         if "--portfolio" in sys.argv:
             idx = sys.argv.index("--portfolio")
             try:
@@ -373,7 +374,7 @@ def main():
                 print("Invalid portfolio value.")
                 sys.exit(1)
 
-        asyncio.run(run_analysis(symbol, portfolio_value=portfolio, force_login=force_login, demo=demo))
+        asyncio.run(run_analysis(symbol, portfolio_value=portfolio, force_login=force_login, demo=demo, deep=deep))
 
     elif command == "demo":
         symbol = sys.argv[2] if len(sys.argv) > 2 else "DEMO"
