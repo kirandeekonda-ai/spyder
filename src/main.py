@@ -354,7 +354,7 @@ async def run_analysis(symbol: str, portfolio_value: float = None, force_login: 
 
     notion = NotionSync()
     if notion.is_connected():
-        page_url = notion.upsert_stock_analysis(result)
+        page_url = notion.upsert_stock_analysis(result, data.get("price_data"))
         if page_url:
             print(f"  [Notion] Page: {page_url}")
 

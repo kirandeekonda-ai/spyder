@@ -74,7 +74,7 @@ class NotionSync:
     # STOCK ANALYSIS DATABASE
     # ─────────────────────────────────────────────────────────────────────────
 
-    def upsert_stock_analysis(self, result: dict) -> str | None:
+    def upsert_stock_analysis(self, result: dict, price_data: dict = None) -> str | None:
         """
         Create or update a stock analysis page in Notion.
         If a page for this symbol already exists, update it.
@@ -95,7 +95,7 @@ class NotionSync:
         existing_id = self._find_page_by_symbol(db_id, symbol)
 
         # Build the page content as markdown blocks
-        page_content = self._build_analysis_blocks(result)
+        page_content = self._build_analysis_blocks(result, price_data)
 
         # Build properties
         verdict_text = result.get("verdict", "INCOMPLETE").replace("✅ ", "").replace("🟡 ", "").replace("🔴 ", "").strip()
@@ -151,7 +151,7 @@ class NotionSync:
             pass
         return None
 
-    def _build_analysis_blocks(self, result: dict) -> list:
+    def _build_analysis_blocks(self, result: dict, price_data: dict = None) -> list:
         """Convert analysis result dict to Notion block format."""
         blocks = []
 
@@ -180,6 +180,48 @@ class NotionSync:
         blocks.append(bullet(f"Fundamentals: {result.get('fundamental_score', 0)}/100 (35% weight)"))
         blocks.append(bullet(f"Technicals: {result.get('technical_score', 0)}/100 (30% weight)"))
         blocks.append(divider())
+
+        # Technical indicators & metrics
+        if price_data:
+            blocks.append(heading("📊 Technical Indicators & Metrics", 2))
+            
+            curr_price = price_data.get("current_price")
+            if curr_price is not None:
+                blocks.append(bullet(f"Current Price: ₹{curr_price:.2f}"))
+                
+            high_52w = price_data.get("52w_high")
+            low_52w = price_data.get("52w_low")
+            if high_52w is not None and low_52w is not None:
+                blocks.append(bullet(f"52-Week Range: ₹{low_52w:.2f} - ₹{high_52w:.2f}"))
+                
+            rsi = price_data.get("rsi")
+            if rsi is not None:
+                blocks.append(bullet(f"RSI (14): {rsi}"))
+                
+            macd = price_data.get("macd_signal")
+            if macd:
+                blocks.append(bullet(f"MACD Signal: {macd.replace('_', ' ').title()}"))
+                
+            dma50 = price_data.get("dma_50")
+            dma150 = price_data.get("dma_150")
+            dma200 = price_data.get("dma_200")
+            if any(v is not None for v in [dma50, dma150, dma200]):
+                dma_str = f"MAs: 50 DMA = ₹{dma50 or 'N/A'}, 150 DMA = ₹{dma150 or 'N/A'}, 200 DMA = ₹{dma200 or 'N/A'}"
+                blocks.append(bullet(dma_str))
+                
+            vol = price_data.get("volume_vs_avg_pct")
+            if vol is not None:
+                blocks.append(bullet(f"Volume vs 20-Day Avg: {vol:+.1f}%"))
+                
+            atr = price_data.get("atr")
+            if atr is not None:
+                blocks.append(bullet(f"ATR (14): ₹{atr:.4f}"))
+                
+            vcp = price_data.get("vcp_detected")
+            if vcp is not None:
+                blocks.append(bullet(f"VCP Pattern Detected: {'Yes' if vcp else 'No'}"))
+                
+            blocks.append(divider())
 
         # Strengths
         if result.get("strengths"):
